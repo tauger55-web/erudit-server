@@ -171,6 +171,25 @@ async def handler(ws: WebSocketServerProtocol) -> None:
                         'from': room.names.get(player_num, '?'),
                     })
 
+            # ── REMATCH: реванш ───────────────────────────────────────────────
+            elif mtype == 'rematch':
+                if room is None:
+                    continue
+                # Помечаем что этот игрок хочет реванш
+                if not hasattr(room, 'rematch_votes'):
+                    room.rematch_votes = set()
+                room.rematch_votes.add(player_num)
+                other = room.other(ws)
+                if other:
+                    # Уведомляем соперника о предложении
+                    await send(other, {'type': 'rematch_request'})
+                # Оба согласились — старт реванша
+                if len(room.rematch_votes) == 2:
+                    room.rematch_votes = set()
+                    room.state = None
+                    await broadcast(room, {'type': 'rematch_start'})
+                    log.info(f"Комната {room.id}: реванш начался")
+
             # ── PING: keepalive ───────────────────────────────────────────────
             elif mtype == 'ping':
                 await send(ws, {'type': 'pong'})
